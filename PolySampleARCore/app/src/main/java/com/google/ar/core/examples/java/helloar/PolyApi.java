@@ -23,7 +23,7 @@ import android.util.Log;
  */
 public class PolyApi {
   // IMPORTANT: replace this with your project's API key.
-  private static String API_KEY = "*** INSERT YOUR API KEY HERE ***";
+  private static String API_KEY = "AIzaSyBYoOIhnetIS7dC7DPrQLgigOVmBHkrD8Q";
 
   private static String TAG = "PolySample";
 
@@ -62,5 +62,42 @@ public class PolyApi {
     // Send an asynchronous request.
     AsyncHttpRequest request = new AsyncHttpRequest(url, handler, completionListener);
     request.send();
+  }
+
+  public static void ListAssets(String keywords, boolean curatedOnly, String category,  Handler handler,
+                                AsyncHttpRequest.CompletionListener completionListener) {
+    // Let's check if the developer (that's you!) correctly replaced the API_KEY with their own
+    // API key in this file. If not, complain.
+    if (API_KEY.startsWith("***")) {
+      Log.e(TAG, "***** API KEY WAS NOT SET.");
+      Log.e(TAG, "***** Please enter your API key in PolyApi.java");
+      completionListener.onHttpRequestFailure(0, "API Key not set! Check PolyApi.java", null);
+      return;
+    }
+
+    // Build the URL to the asset. It should be something like:
+    //   https://poly.googleapis.com/v1/assets?key=YOUR_API_KEY_HERE
+    Uri.Builder urlBuilder = new Uri.Builder()
+            .scheme("https")
+            .authority(HOST)
+            .appendPath("v1")
+            .appendPath("assets")
+            .appendQueryParameter("key", API_KEY)
+            .appendQueryParameter("curated", Boolean.toString(curatedOnly))
+            .appendQueryParameter("format", "GLTF2")
+            .appendQueryParameter("pageSize", "100");
+
+
+    if (keywords != null && !keywords.isEmpty()) {
+      urlBuilder.appendQueryParameter("keywords", keywords);
+    }
+    if (category != null && !category.isEmpty()) {
+      urlBuilder.appendQueryParameter("category", category);
+    }
+    String url = urlBuilder.build().toString();
+    // Send an asynchronous request.
+    AsyncHttpRequest request = new AsyncHttpRequest(url, handler, completionListener);
+    request.send();
+
   }
 }
