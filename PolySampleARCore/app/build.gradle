@@ -28,10 +28,7 @@ dependencies {
     implementation 'com.google.ar.sceneform.ux:sceneform-ux:1.5.0'
     implementation 'com.google.ar.sceneform:assets:1.5.0'
 
-    // Obj - a simple Wavefront OBJ file loader
-    // https://github.com/javagl/Obj
-    implementation 'de.javagl:obj:0.3.0'
-
     implementation 'com.android.support:appcompat-v7:27.1.1'
     implementation 'com.android.support:design:27.1.1'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.3'
 }
