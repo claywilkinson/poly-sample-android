@@ -22,8 +22,12 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.HitResult;
@@ -37,6 +41,8 @@ import com.google.ar.sceneform.ux.TransformableNode;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.List;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -66,20 +72,26 @@ public class HelloArActivity extends AppCompatActivity {
   // Have we already shown the attribution toast?
   private boolean mShowedAttributionToast;
   private Renderable renderable;
+  private Handler mBackgroundThreadHandler;
+
+  private RecyclerView gallery;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
-    arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arfragment);
+    arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.sceneform_fragment);
     arFragment.setOnTapArPlaneListener(this::onTapPlane);
+
+    findViewById(R.id.fab).setOnClickListener(this::onSearch);
+
 
     // Create a background thread, where we will do the heavy lifting.
     // Our background thread, which does all of the heavy lifting so we don't block the main thread.
     HandlerThread mBackgroundThread = new HandlerThread("Worker");
     mBackgroundThread.start();
     // Handler for the background thread, to which we post background thread tasks.
-    Handler mBackgroundThreadHandler = new Handler(mBackgroundThread.getLooper());
+     mBackgroundThreadHandler = new Handler(mBackgroundThread.getLooper());
 
     // Request the asset from the Poly API.
     Log.d(TAG, "Requesting asset "+ ASSET_ID);
@@ -97,6 +109,9 @@ public class HelloArActivity extends AppCompatActivity {
       }
     });
 
+  }
+
+  private void onSearch(View view) {
     PolyApi.ListAssets("android", false, "", mBackgroundThreadHandler,
             new AsyncHttpRequest.CompletionListener() {
               @Override
@@ -153,6 +168,27 @@ public class HelloArActivity extends AppCompatActivity {
 
     try {
       JSONObject response = new JSONObject(assetBody);
+      gallery = findViewById(R.id.recyclerView);
+      gallery.setHasFixedSize(true);
+
+      LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+      layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
+      gallery.setLayoutManager(layoutManager);
+
+      List<GalleryAdapter.GalleryItem> items = new ArrayList<>();
+
+
+      /* for each model
+      ImageView cabin = new ImageView(this);
+        cabin.setImageResource(R.drawable.cabin_thumb);
+        cabin.setContentDescription("cabin");
+        cabin.setOnClickListener(view ->{addObject(Uri.parse("Cabin.sfb"));});
+        gallery.addView(cabin);
+       */
+
+      GalleryAdapter galleryAdapter = new GalleryAdapter(items);
+      gallery.setAdapter(galleryAdapter);
+
     } catch (JSONException e) {
       Log.e(TAG, "JSON parsing error while processing response: " + e);
       e.printStackTrace();
