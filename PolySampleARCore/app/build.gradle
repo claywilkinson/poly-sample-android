@@ -22,7 +22,7 @@ android {
 
         applicationId "com.google.clayton.polysample"
 
-        // 24 is the minimum since ARCore only works with 24 and higher.
+        // Sceneform requires N (API level 24).
         minSdkVersion 24
         targetSdkVersion 27
         versionCode 1

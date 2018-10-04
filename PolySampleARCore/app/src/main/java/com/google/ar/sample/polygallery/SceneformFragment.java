@@ -1,3 +1,18 @@
+/*
+ * Copyright 2018 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.google.ar.sample.polygallery;
 
 import android.os.Bundle;
@@ -9,20 +24,20 @@ import android.view.WindowManager;
 
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.sceneform.SceneView;
-import com.google.ar.sceneform.math.Quaternion;
-import com.google.ar.sceneform.math.Vector3;
 
+/**
+ * Fragment for holding a non-AR Sceneform SceneView.
+ */
 public class SceneformFragment extends android.support.v4.app.Fragment {
-
-
   public SceneformFragment() {
     super();
   }
+
   @Override
   public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                            Bundle savedInstanceState) {
 
-    View view =  inflater.inflate(R.layout.sceneform_fragment, container, false);
+    View view = inflater.inflate(R.layout.sceneform_fragment, container, false);
     view.getViewTreeObserver().addOnWindowFocusChangeListener(this::onWindowFocusChanged);
 
     return view;
@@ -32,9 +47,9 @@ public class SceneformFragment extends android.support.v4.app.Fragment {
   public void onResume() {
     super.onResume();
     /*
-    *
-    *  N O T E:  It is important to call resume and pause on the SceneView.  If you don't, then
-    *  nothing will render.
+     *
+     *  N O T E:  It is important to call resume and pause on the SceneView.  If you don't, then
+     *  nothing will render.
      */
     try {
       getSceneView().resume();
@@ -65,6 +80,6 @@ public class SceneformFragment extends android.support.v4.app.Fragment {
   }
 
   public SceneView getSceneView() {
-      return  getActivity() == null ? null : getActivity().findViewById(R.id.scene_view);
+    return getActivity() == null ? null : getActivity().findViewById(R.id.scene_view);
   }
 }

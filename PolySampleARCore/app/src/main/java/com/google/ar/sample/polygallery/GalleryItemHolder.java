@@ -23,43 +23,58 @@ import android.view.View;
  * ViewHolder for showing a thumbnail of a model from Poly.
  */
 public class GalleryItemHolder extends RecyclerView.ViewHolder {
-    private static final int SELECTED_COLOR = Color.WHITE;
-    private static final int DESELECTED_COLOR = Color.DKGRAY;
-    private final GalleryAdapter adapter;
-    private GalleryItem item;
+  private static final int SELECTED_COLOR = Color.WHITE;
+  private static final int DESELECTED_COLOR = Color.DKGRAY;
+  private final GalleryAdapter adapter;
+  private GalleryItem item;
 
-    public GalleryItemHolder(View itemView, GalleryAdapter galleryAdapter) {
-        super(itemView);
-        this.adapter = galleryAdapter;
-    }
+  /**
+   * Constructs a ViewHolder.
+   *
+   * @param itemView       the view for the item.
+   * @param galleryAdapter the adapter used to create this holder.
+   */
+  public GalleryItemHolder(View itemView, GalleryAdapter galleryAdapter) {
+    super(itemView);
+    this.adapter = galleryAdapter;
+  }
 
-    public void setItem(GalleryItem item) {
-        this.item = item;
-        itemView.setOnClickListener(this::onClick);
-        if (!item.equals(adapter.getSelected())) {
-            itemView.setBackgroundColor(DESELECTED_COLOR);
-            itemView.setSelected(false);
-        } else {
-            itemView.setSelected(true);
-            itemView.setBackgroundColor(SELECTED_COLOR);
-        }
+  /**
+   * Sets the item for this view holder.  The view is updated to
+   * handle selection and selection state.
+   *
+   * @param item - from the adapter associated with this view holder.
+   */
+  public void setItem(GalleryItem item) {
+    this.item = item;
+    itemView.setOnClickListener(this::onClick);
+    if (!item.equals(adapter.getSelected())) {
+      itemView.setBackgroundColor(DESELECTED_COLOR);
+      itemView.setSelected(false);
+    } else {
+      itemView.setSelected(true);
+      itemView.setBackgroundColor(SELECTED_COLOR);
     }
+  }
 
-    private void onClick(View view) {
-        GalleryItem selected = adapter.getSelected();
-        if (!item.equals(selected)) {
-            if (selected != null) {
-                selected.getViewHolder().itemView.setBackgroundColor(DESELECTED_COLOR);
-            }
-            adapter.setSelected(item);
-            itemView.setSelected(true);
-            itemView.setBackgroundColor(SELECTED_COLOR);
-        } else {
-            adapter.setSelected(null);
-            itemView.setSelected(false);
-            itemView.setBackgroundColor(DESELECTED_COLOR);
-        }
+  /**
+   * Handles the click to select an item.
+   */
+  private void onClick(View view) {
+    GalleryItem selected = adapter.getSelected();
+    if (!item.equals(selected)) {
+      if (selected != null) {
+        selected.getViewHolder().itemView.setBackgroundColor(DESELECTED_COLOR);
+      }
+      adapter.setSelected(item);
+      itemView.setSelected(true);
+      itemView.setBackgroundColor(SELECTED_COLOR);
+    } else {
+      adapter.setSelected(null);
+      itemView.setSelected(false);
+      itemView.setBackgroundColor(DESELECTED_COLOR);
     }
+  }
 
 
 }

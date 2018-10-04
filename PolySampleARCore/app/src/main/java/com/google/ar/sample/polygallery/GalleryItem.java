@@ -28,119 +28,168 @@ import com.google.ar.sceneform.assets.RenderableSource;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 public class GalleryItem {
-    private static final String TAG = "GalleryItem";
-    private final String key;
-    private String displayName;
-    private String authorName;
-    private String license;
-    private String description;
-    private String thumbnail;
-    private String modelUrl;
-    private CompletableFuture<Bitmap> thumbnailHolder;
-    private RecyclerView.ViewHolder viewHolder;
-    private CompletableFuture<ModelRenderable> renderableHolder;
+  private static final String TAG = "GalleryItem";
 
-    public GalleryItem(String key) {
-        this.key = key;
-    }
+  // Used to identify the model.  For example it is used as the sceneform registryId.
+  private final String key;
 
-    public String getDisplayName() {
-        return displayName;
-    }
+  // Fields from the Poly asset data.
+  private String displayName;
+  private String authorName;
+  private String license;
+  private String description;
+  private String thumbnail;
+  private String modelUrl;
 
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
-    }
+  // A completableFuture to hold the thumbnail bitmap.  It is loaded asynchronously, thus the
+  // future.
+  private CompletableFuture<Bitmap> thumbnailHolder;
 
-    public void setAuthorInfo(String authorName, String license) {
-        this.authorName = authorName;
-        this.license = license;
-    }
+  // Reference to the viewHolder holding this item, can be null.
+  private RecyclerView.ViewHolder viewHolder;
 
-    public String getAuthor() {
-        return authorName;
-    }
+  // Future used when loading the model.
+  private CompletableFuture<ModelRenderable> renderableHolder;
 
-    public String getLicense() {
-        return license;
-    }
+  /**
+   * Constructor.
+   *
+   * @param key a string used to identify this asset.
+   */
+  public GalleryItem(String key) {
+    this.key = key;
+  }
 
-    public String getDescription() {
-        return description;
-    }
+  /**
+   * The display name of the asset.
+   */
+  public String getDisplayName() {
+    return displayName;
+  }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+  public void setDisplayName(String displayName) {
+    this.displayName = displayName;
+  }
 
-    public String getThumbnail() {
-        return thumbnail;
-    }
+  /**
+   * Sets the author name and the license of the asset.
+   */
+  public void setAuthorInfo(String authorName, String license) {
+    this.authorName = authorName;
+    this.license = license;
+  }
 
-    public void setThumbnail(String thumbnail) {
-        this.thumbnail = thumbnail;
-    }
+  public String getAuthor() {
+    return authorName;
+  }
 
-    public void loadThumbnail(Handler handler) {
-        // Send an asynchronous request.
-        if (thumbnailHolder == null) {
-            thumbnailHolder = new CompletableFuture<>();
-            AsyncHttpRequest request = new AsyncHttpRequest(getThumbnail(),
-                    handler, new AsyncHttpRequest.CompletionListener() {
+  public String getLicense() {
+    return license;
+  }
 
-                @Override
-                public void onHttpRequestSuccess(byte[] responseBody) {
-                    thumbnailHolder.complete(BitmapFactory.decodeByteArray(responseBody,
-                            0, responseBody.length));
-                }
+  /**
+   * The description of the asset, if any.
+   */
+  public String getDescription() {
+    return description;
+  }
 
-                @Override
-                public void onHttpRequestFailure(int statusCode, String message, Exception exception) {
-                    Log.e(TAG, "Cannot load thumbnail: " + statusCode + " " + message, exception);
-                    thumbnailHolder.completeExceptionally(exception);
-                }
-            });
-            request.send();
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  /**
+   * The URL to the thumbnail for this asset.
+   */
+  public String getThumbnail() {
+    return thumbnail;
+  }
+
+  public void setThumbnail(String thumbnail) {
+    this.thumbnail = thumbnail;
+  }
+
+  /**
+   * Starts the asynchronous loading of the thumbnail bitmap.
+   * The handler is used to process the request. The results of loading are accessed via
+   *
+   * @param handler
+   * @see #getThumbnailHolder()
+   */
+  public void loadThumbnail(Handler handler) {
+    // Send an asynchronous request.
+    if (thumbnailHolder == null) {
+      thumbnailHolder = new CompletableFuture<>();
+      AsyncHttpRequest request = new AsyncHttpRequest(getThumbnail(),
+              handler, new AsyncHttpRequest.CompletionListener() {
+
+        @Override
+        public void onHttpRequestSuccess(byte[] responseBody) {
+          thumbnailHolder.complete(BitmapFactory.decodeByteArray(responseBody,
+                  0, responseBody.length));
         }
-    }
 
-    public String getModelUrl() {
-        return modelUrl;
-    }
-
-    public void setModelUrl(String modelUrl) {
-        this.modelUrl = modelUrl;
-    }
-
-    public RecyclerView.ViewHolder getViewHolder() {
-        return viewHolder;
-    }
-
-    public void setViewHolder(RecyclerView.ViewHolder viewHolder) {
-        this.viewHolder = viewHolder;
-    }
-
-    public CompletableFuture<ModelRenderable> getRenderableHolder() {
-
-        if (renderableHolder == null) {
-            Context context = viewHolder.itemView.getContext();
-            RenderableSource source = RenderableSource.builder().setSource(context,
-                    Uri.parse(modelUrl), RenderableSource.SourceType.GLTF2)
-                    .setRecenterMode(RenderableSource.RecenterMode.ROOT)
-                    .build();
-
-
-            renderableHolder = ModelRenderable.builder().setRegistryId(key)
-                    .setSource(context, source)
-                    .build();
+        @Override
+        public void onHttpRequestFailure(int statusCode, String message, Exception exception) {
+          Log.e(TAG, "Cannot load thumbnail: " + statusCode + " " + message, exception);
+          thumbnailHolder.completeExceptionally(exception);
         }
-        return renderableHolder;
+      });
+      request.send();
     }
+  }
 
-    public CompletionStage<Bitmap> getThumbnailHolder() {
-        return thumbnailHolder;
+  /**
+   * Sets the model URL.  This is loaded by calling {link #getRenderableHolder()}
+   *
+   * @param modelUrl
+   */
+  public void setModelUrl(String modelUrl) {
+    this.modelUrl = modelUrl;
+  }
+
+  /**
+   * Returns the currently associated ViewHolder for this item.
+   *
+   * @return null if no view holder.
+   */
+  public RecyclerView.ViewHolder getViewHolder() {
+    return viewHolder;
+  }
+
+  public void setViewHolder(RecyclerView.ViewHolder viewHolder) {
+    this.viewHolder = viewHolder;
+  }
+
+  /**
+   * Returns the future for the ModelRenderable.  This starts the loading process if not
+   * already started.
+   */
+  public CompletableFuture<ModelRenderable> getRenderableHolder() {
+
+    if (renderableHolder == null) {
+      Context context = viewHolder.itemView.getContext();
+      RenderableSource source = RenderableSource.builder().setSource(context,
+              Uri.parse(modelUrl), RenderableSource.SourceType.GLTF2)
+              .setRecenterMode(RenderableSource.RecenterMode.ROOT)
+              .build();
+
+
+      renderableHolder = ModelRenderable.builder().setRegistryId(key)
+              .setSource(context, source)
+              .build();
     }
+    return renderableHolder;
+  }
+
+  /**
+   * Returns the future for the thumbnail bitmap.  The loading is done via {link #loadThumbnail()}.
+   *
+   * @return the future, or null if loadThumbnail has not been called.
+   */
+  public CompletableFuture<Bitmap> getThumbnailHolder() {
+    return thumbnailHolder;
+  }
 }

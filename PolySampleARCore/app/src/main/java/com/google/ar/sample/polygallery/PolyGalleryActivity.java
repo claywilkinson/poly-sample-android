@@ -58,336 +58,343 @@ import java.util.Objects;
  * plane to place a 3d model of the Android robot.
  */
 public class PolyGalleryActivity extends AppCompatActivity {
-    private static final String TAG = PolyGalleryActivity.class.getSimpleName();
-    private static final Vector3 STARTING_CAMERA_POSITION = new Vector3(0, 2, 3);
-    private static final Quaternion STARTING_CAMERA_ROTATION = Quaternion.axisAngle(Vector3.left(), 15f);
-    private RecyclerView gallery;
-    private TextView model_info;
-    private SceneContext sceneContext;
+  private static final String TAG = PolyGalleryActivity.class.getSimpleName();
+  private static final Vector3 STARTING_CAMERA_POSITION = new Vector3(0, 2, 3);
+  private static final Quaternion STARTING_CAMERA_ROTATION = Quaternion.axisAngle(Vector3.left(), 15f);
+  private RecyclerView gallery;
+  private TextView model_info;
+  private SceneContext sceneContext;
 
-    private Handler mBackgroundThreadHandler;
-    private Fragment fragment;
+  private Handler mBackgroundThreadHandler;
+  private Fragment fragment;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
 
-        gallery = findViewById(R.id.recyclerView);
-        intializeGallery(gallery);
+    gallery = findViewById(R.id.recyclerView);
+    intializeGallery(gallery);
 
-        findViewById(R.id.search).setOnClickListener(this::onSearch);
+    findViewById(R.id.search).setOnClickListener(this::onSearch);
 
-        sceneContext = new SceneContext(this);
+    sceneContext = new SceneContext(this);
 
-        Switch arToggle = findViewById(R.id.ar_mode_toggle);
-        arToggle.setChecked(true);
-        arToggle.setOnCheckedChangeListener(this::onArToggle);
-        initializeARMode();
+    Switch arToggle = findViewById(R.id.ar_mode_toggle);
+    arToggle.setChecked(true);
+    arToggle.setOnCheckedChangeListener(this::onArToggle);
+    initializeARMode();
 
-        // This is a text overlay.
-        model_info = findViewById(R.id.model_info);
+    // This is a text overlay.
+    model_info = findViewById(R.id.model_info);
 
-        // Create a background thread, where we will do the heavy lifting.
-        // Our background thread, which does all of the heavy lifting so we don't block the main thread.
-        HandlerThread mBackgroundThread = new HandlerThread("Worker");
-        mBackgroundThread.start();
-        // Handler for the background thread, to which we post background thread tasks.
-        mBackgroundThreadHandler = new Handler(mBackgroundThread.getLooper());
+    // Create a background thread, where we will do the heavy lifting.
+    // Our background thread, which does all of the heavy lifting so we don't block the main thread.
+    HandlerThread mBackgroundThread = new HandlerThread("Worker");
+    mBackgroundThread.start();
+    // Handler for the background thread, to which we post background thread tasks.
+    mBackgroundThreadHandler = new Handler(mBackgroundThread.getLooper());
+  }
+
+  /**
+   * Handles the toggling between AR and non-AR mode.
+   */
+  private void onArToggle(CompoundButton compoundButton, boolean checked) {
+    if (checked) {
+      Log.d(TAG, "Switching to AR Mode.");
+      initializeARMode();
+    } else {
+      Log.d(TAG, "Switching to non-AR mode.");
+      initializeNonArMode();
+    }
+  }
+
+  /**
+   * Switches the fragment to use AR.
+   */
+  private void initializeARMode() {
+    setInfoText("Switching to AR mode.");
+    cleanupFragment(fragment);
+
+    // Put the AR Fragment in the layout.
+    fragment = new ArFragment();
+    getSupportFragmentManager().beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commitAllowingStateLoss();
+
+    // Add a listener that is called when the fragment is initialized and onResume is called
+    // indicating the fragment is running.
+    fragment.getLifecycle().addObserver(new LifecycleObserver() {
+      @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+      public void connectListener() {
+        ArFragment arFragment = (ArFragment) fragment;
+        arFragment.setOnTapArPlaneListener(PolyGalleryActivity.this::onTapPlane);
+        Objects.requireNonNull(getScene()).addOnUpdateListener(
+                PolyGalleryActivity.this::onSceneUpdate);
+        fragment.getLifecycle().removeObserver(this);
+      }
+    });
+  }
+
+  /**
+   * Switches the fragment to non-AR mode.
+   */
+  private void initializeNonArMode() {
+    setInfoText("Switching to non-AR mode.");
+    cleanupFragment(fragment);
+
+    fragment = new SceneformFragment();
+    getSupportFragmentManager().beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commitAllowingStateLoss();
+
+    fragment.getLifecycle().addObserver(new LifecycleObserver() {
+      @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+      public void connectListener() {
+        SceneformFragment sceneformFragment = (SceneformFragment) fragment;
+
+        // Keeping it simple, and just look for a tap event on the fragment.
+        // Had this been an actual application, gesture processing would be more appropriate.
+        sceneformFragment.getSceneView().setOnClickListener(PolyGalleryActivity.this::onSceneTouch);
+        sceneformFragment.getSceneView().getScene().addOnUpdateListener(
+                PolyGalleryActivity.this::onSceneUpdate);
+        fragment.getLifecycle().removeObserver(this);
+
+        // Initialize the scene since AR is not used, we need to position the camera.
+        initializeNonArScene();
+      }
+    });
+  }
+
+  /**
+   * Move the camera to a reasonable default to simulate where the camera would be in AR mode.
+   */
+  private void initializeNonArScene() {
+    Camera camera = Objects.requireNonNull(getScene()).getCamera();
+    camera.setWorldPosition(STARTING_CAMERA_POSITION);
+    camera.setWorldRotation(STARTING_CAMERA_ROTATION);
+  }
+
+  /**
+   * Abstracts the getting of the Scene object.
+   *
+   * @return The Scenform scene or null if a SceneView is not available.
+   */
+  private Scene getScene() {
+    SceneView sceneView = null;
+    if (fragment instanceof ArFragment) {
+      sceneView = ((ArFragment) fragment).getArSceneView();
+    } else if (fragment instanceof SceneformFragment) {
+      sceneView = ((SceneformFragment) fragment).getSceneView();
+    }
+    return sceneView != null ? sceneView.getScene() : null;
+  }
+
+  /**
+   * Clean up when swapping out fragments.  This removes listeners and also removes all the
+   * Sceneform objects since they are bound to the Sceneform.
+   *
+   * @param fragment - the fragment of interest.
+   */
+  private void cleanupFragment(Fragment fragment) {
+    if (fragment == null) {
+      return;
+    }
+    Scene scene = null;
+    if (fragment instanceof ArFragment) {
+      scene = ((ArFragment) fragment).getArSceneView().getScene();
+      ((ArFragment) fragment).setOnTapArPlaneListener(null);
+    } else if (fragment instanceof SceneformFragment) {
+      SceneView view = ((SceneformFragment) fragment).getSceneView();
+      if (view != null) {
+        scene = view.getScene();
+        view.setOnClickListener(null);
+      }
+    }
+    if (scene != null) {
+      scene.removeOnUpdateListener(this::onSceneUpdate);
     }
 
-    /**
-     * Handles the toggling between AR and non-AR mode.
-     */
-    private void onArToggle(CompoundButton compoundButton, boolean checked) {
-        if (checked) {
-            Log.d(TAG, "Switching to AR Mode.");
-            initializeARMode();
-        } else {
-            Log.d(TAG, "Switching to non-AR mode.");
-            initializeNonArMode();
-        }
-    }
+    sceneContext.resetContext();
+  }
 
-    private void initializeARMode() {
-        setInfoText("Switching to AR mode.");
-        cleanupFragment(fragment);
+  /**
+   * Initializes the gallery that will hold the poly objects.
+   *
+   * @param view - the Recycler view.
+   */
+  private void intializeGallery(RecyclerView view) {
+    LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+    layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
+    view.setLayoutManager(layoutManager);
+    view.setItemAnimator(null);
+    view.setHasFixedSize(false);
+  }
 
-        // Put the AR Fragment in the layout.
-        fragment = new ArFragment();
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .commitAllowingStateLoss();
-
-        // Add a listener that is called when the fragment is initialized and onResume is called
-        // indicating the fragment is running.
-        fragment.getLifecycle().addObserver(new LifecycleObserver() {
-            @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
-            public void connectListener() {
-                ArFragment arFragment = (ArFragment) fragment;
-                arFragment.setOnTapArPlaneListener(PolyGalleryActivity.this::onTapPlane);
-                Objects.requireNonNull(getScene()).addOnUpdateListener(
-                        PolyGalleryActivity.this::onSceneUpdate);
-                fragment.getLifecycle().removeObserver(this);
-            }
-        });
-    }
-
-    private void initializeNonArMode() {
-        setInfoText("Switching to non-AR mode.");
-        cleanupFragment(fragment);
-
-        fragment = new SceneformFragment();
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .commitAllowingStateLoss();
-
-        fragment.getLifecycle().addObserver(new LifecycleObserver() {
-            @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
-            public void connectListener() {
-                SceneformFragment sceneformFragment = (SceneformFragment) fragment;
-
-                // Keeping it simple, and just look for a tap event on the fragment.
-                // Had this been an actual application, gesture processing would be more appropriate.
-                sceneformFragment.getSceneView().setOnClickListener(PolyGalleryActivity.this::onSceneTouch);
-                sceneformFragment.getSceneView().getScene().addOnUpdateListener(
-                        PolyGalleryActivity.this::onSceneUpdate);
-                fragment.getLifecycle().removeObserver(this);
-
-                // Initialize the scene since AR is not used, we need to position the camera.
-                initializeNonArScene();
-            }
-        });
-    }
-
-    /**
-     * Move the camera to a reasonable default to simulate where the camera would be in AR mode.
-     */
-    private void initializeNonArScene() {
-        Camera camera = Objects.requireNonNull(getScene()).getCamera();
-        camera.setWorldPosition(STARTING_CAMERA_POSITION);
-        camera.setWorldRotation(STARTING_CAMERA_ROTATION);
-    }
-
-    /**
-     * Abstracts the getting of the Scene object.
-     *
-     * @return The Scenform scene or null if a SceneView is not available.
-     */
-    private Scene getScene() {
-        SceneView sceneView = null;
-        if (fragment instanceof ArFragment) {
-            sceneView = ((ArFragment) fragment).getArSceneView();
-        } else if (fragment instanceof SceneformFragment) {
-            sceneView = ((SceneformFragment) fragment).getSceneView();
-        }
-        return sceneView != null ? sceneView.getScene() : null;
-    }
-
-    /**
-     * Clean up when swapping out fragments.  This removes listeners and also removes all the
-     * Sceneform objects since they are bound to the Sceneform.
-     *
-     * @param fragment - the fragment of interest.
-     */
-    private void cleanupFragment(Fragment fragment) {
-        if (fragment == null) {
-            return;
-        }
-        Scene scene = null;
-        if (fragment instanceof ArFragment) {
-            scene = ((ArFragment) fragment).getArSceneView().getScene();
-            ((ArFragment) fragment).setOnTapArPlaneListener(null);
-        } else if (fragment instanceof SceneformFragment) {
-            SceneView view = ((SceneformFragment) fragment).getSceneView();
-            if (view != null) {
-                scene = view.getScene();
-                view.setOnClickListener(null);
-            }
-        }
-        if (scene != null) {
-            scene.removeOnUpdateListener(this::onSceneUpdate);
-        }
-
-        sceneContext.resetContext();
-    }
-
-    /**
-     * Initializes the gallery that will hold the poly objects.
-     *
-     * @param view - the Recycler view.
-     */
-    private void intializeGallery(RecyclerView view) {
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
-        view.setLayoutManager(layoutManager);
-        view.setItemAnimator(null);
-        view.setHasFixedSize(false);
-    }
-
-    /**
-     * Handle searching Poly for models.
-     *
-     * @param view - the button/view triggering the search.
-     */
-    private void onSearch(View view) {
-        final View search_dialog = this.getLayoutInflater().inflate(R.layout.search_dialog,
-                (ViewGroup) view.getParent(), false);
-        final TextView keywordView = search_dialog.findViewById(R.id.keywords);
-        keywordView.setText(R.string.default_search_keywords);
-        new AlertDialog.Builder(this).setTitle(R.string.search_poly)
-                .setView(search_dialog)
-                .setPositiveButton(R.string.search, (dialogInterface, i) -> {
-                            String kw = keywordView.getText().toString();
-                            doPolySearch(kw);
-                        }
-                )
-                .setCancelable(true)
-                .create().show();
-    }
-
-    /**
-     * Send the poly search and populate the gallery adapter.
-     * @param keywords - the keywords to search for.
-     */
-    private void doPolySearch(String keywords) {
-        PolyApi.ListAssets(keywords, false, "", mBackgroundThreadHandler,
-                new AsyncHttpRequest.CompletionListener() {
-                    @Override
-                    public void onHttpRequestSuccess(byte[] responseBody) {
-                        try {
-                            final List<GalleryItem> items = GalleryAdapter.parseListResults(
-                                    responseBody, mBackgroundThreadHandler);
-                            runOnUiThread(() -> {
-                                GalleryAdapter galleryAdapter = new GalleryAdapter(items);
-                                gallery.setAdapter(galleryAdapter);
-                            });
-                        } catch (IOException e) {
-                            handleRequestFailure(-1, "Error parsing list", e);
-                        }
+  /**
+   * Handle searching Poly for models.
+   *
+   * @param view - the button/view triggering the search.
+   */
+  private void onSearch(View view) {
+    final View search_dialog = this.getLayoutInflater().inflate(R.layout.search_dialog,
+            (ViewGroup) view.getParent(), false);
+    final TextView keywordView = search_dialog.findViewById(R.id.keywords);
+    keywordView.setText(R.string.default_search_keywords);
+    new AlertDialog.Builder(this).setTitle(R.string.search_poly)
+            .setView(search_dialog)
+            .setPositiveButton(R.string.search, (dialogInterface, i) -> {
+                      String kw = keywordView.getText().toString();
+                      doPolySearch(kw);
                     }
+            )
+            .setCancelable(true)
+            .create().show();
+  }
 
-                    @Override
-                    public void onHttpRequestFailure(int code, String message, Exception ex) {
-                        // Something went wrong with the request.
-                        handleRequestFailure(code, message, ex);
-                    }
-                });
+  /**
+   * Send the poly search and populate the gallery adapter.
+   *
+   * @param keywords - the keywords to search for.
+   */
+  private void doPolySearch(String keywords) {
+    PolyApi.ListAssets(keywords, false, "", mBackgroundThreadHandler,
+            new AsyncHttpRequest.CompletionListener() {
+              @Override
+              public void onHttpRequestSuccess(byte[] responseBody) {
+                try {
+                  final List<GalleryItem> items = GalleryAdapter.parseListResults(
+                          responseBody, mBackgroundThreadHandler);
+                  runOnUiThread(() -> {
+                    GalleryAdapter galleryAdapter = new GalleryAdapter(items);
+                    gallery.setAdapter(galleryAdapter);
+                  });
+                } catch (IOException e) {
+                  handleRequestFailure(-1, "Error parsing list", e);
+                }
+              }
+
+              @Override
+              public void onHttpRequestFailure(int code, String message, Exception ex) {
+                // Something went wrong with the request.
+                handleRequestFailure(code, message, ex);
+              }
+            });
+  }
+
+  /**
+   * Called on every frame.  This updates the information and moves nodes as needed.
+   *
+   * @param frameTime - unused.
+   */
+  private void onSceneUpdate(FrameTime frameTime) {
+
+    // Show the "what to do" text until there is a model selected and placed.
+    if (gallery.getAdapter() == null || gallery.getAdapter().getItemCount() == 0) {
+      setInfoText("Search Poly for models");
+      return;
+    }
+    if (!sceneContext.hasModelNode()) {
+      setInfoText("Select a model and tap a plane to place");
+      return;
     }
 
-    /**
-     * Called on every frame.  This updates the information and moves nodes as needed.
-     *
-     * @param frameTime - unused.
-     */
-    private void onSceneUpdate(FrameTime frameTime) {
+    Scene scene = getScene();
 
-        // Show the "what to do" text until there is a model selected and placed.
-        if (gallery.getAdapter() == null || gallery.getAdapter().getItemCount() == 0) {
-            setInfoText("Search Poly for models");
-            return;
-        }
-        if (sceneContext.hasModelNode()) {
-            setInfoText("Select a model and tap a plane to place");
-            return;
-        }
-
-        Scene scene = getScene();
-
-        if (scene == null) {
-            return;
-        }
-
-        Camera camera = scene.getCamera();
-
-        setInfoText(sceneContext.setModelInfo(camera));
-
-        sceneContext.rotateInfoCardToCamera(camera);
-
+    if (scene == null) {
+      return;
     }
 
-    private void onSceneTouch(View view) {
-        // Place a node at the center of the view.
+    Camera camera = scene.getCamera();
 
-        SceneView sceneView = (SceneView) view;
-        Ray ray =
-                sceneView.getScene().getCamera().screenPointToRay(sceneView.getWidth() / 2,
-                        sceneView.getHeight() - sceneView.getHeight() / 4);
+    setInfoText(sceneContext.generateNodeInfo(camera));
 
-        Vector3 pos = ray.getPoint(1f);
+    sceneContext.rotateInfoCardToCamera(camera);
 
-        // Get the model selected from the Gallery.
-        GalleryItem selectedItem = ((GalleryAdapter) gallery.getAdapter()).getSelected();
-        if (selectedItem == null) {
-            return;
-        }
-        // Update the status.
-        setInfoText("loading model " + selectedItem.getDisplayName());
+  }
 
-        sceneContext.resetModelNode(getScene(), pos);
+  private void onSceneTouch(View view) {
+    // Place a node at the center of the view.
 
-        sceneContext.attachInfoCardNode(selectedItem);
+    SceneView sceneView = (SceneView) view;
+    Ray ray =
+            sceneView.getScene().getCamera().screenPointToRay(sceneView.getWidth() / 2,
+                    sceneView.getHeight() - sceneView.getHeight() / 4);
 
-        // Set the renderable from the gallery.
-        selectedItem.getRenderableHolder()
-                .thenAccept(renderable -> sceneContext.setModelRenderable(renderable))
-                .exceptionally(throwable -> {
-            handleRequestFailure(-1, throwable.getMessage(), (Exception) throwable);
-            return null;
-        });
+    Vector3 pos = ray.getPoint(1f);
+
+    // Get the model selected from the Gallery.
+    GalleryItem selectedItem = ((GalleryAdapter) gallery.getAdapter()).getSelected();
+    if (selectedItem == null) {
+      return;
     }
+    // Update the status.
+    setInfoText("loading model " + selectedItem.getDisplayName());
 
-    private void onTapPlane(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
-        // Get the model selected from the Gallery.
-        GalleryItem selectedItem = ((GalleryAdapter) gallery.getAdapter()).getSelected();
-        if (selectedItem == null) {
-            return;
-        }
-        // Create the Anchor.
-        Anchor anchor = hitResult.createAnchor();
+    sceneContext.resetModelNode(getScene(), pos);
 
-        sceneContext.resetAnchorNode(anchor, getScene());
+    sceneContext.attachInfoCardNode(selectedItem);
 
-        // Update the status.
-        setInfoText("loading model " + selectedItem.getDisplayName());
+    // Set the renderable from the gallery.
+    selectedItem.getRenderableHolder()
+            .thenAccept(renderable -> sceneContext.setModelRenderable(renderable))
+            .exceptionally(throwable -> {
+              handleRequestFailure(-1, throwable.getMessage(), (Exception) throwable);
+              return null;
+            });
+  }
 
-        TransformableNode transformableNode = new TransformableNode(
-                ((ArFragment) fragment).getTransformationSystem());
-
-        sceneContext.attachModelNodeToAnchorNode(transformableNode);
-
-        transformableNode.select();
-
-        sceneContext.attachInfoCardNode(selectedItem);
-
-        // Set the renderable from the gallery.
-        selectedItem.getRenderableHolder().thenAccept(renderable -> {
-            sceneContext.setModelRenderable(renderable);
-            SceneContext.setScaleRange(transformableNode, .01f, 3f);
-        }).exceptionally(throwable -> {
-            handleRequestFailure(-1, throwable.getMessage(), (Exception) throwable);
-            return null;
-        });
+  private void onTapPlane(HitResult hitResult, Plane plane, MotionEvent motionEvent) {
+    // Get the model selected from the Gallery.
+    GalleryItem selectedItem = ((GalleryAdapter) gallery.getAdapter()).getSelected();
+    if (selectedItem == null) {
+      return;
     }
+    // Create the Anchor.
+    Anchor anchor = hitResult.createAnchor();
 
-    /**
-     * Set the text of the info overlay.
-     */
-    private void setInfoText(String msg) {
-        if (model_info != null) {
-            model_info.setText(msg);
-        }
-    }
+    sceneContext.resetAnchorNode(anchor, getScene());
 
-    private void handleRequestFailure(int statusCode, String message, Exception exception) {
-        runOnUiThread(() ->
-        {
-            String msg = "Request failed. Status code " + statusCode + ", message: " + message +
-                    ((exception != null) ? ", exception: " + exception : "");
-            new AlertDialog.Builder(this).setTitle("Error").
-                    setMessage(msg).create().show();
-            Log.e(TAG, msg);
-            if (exception != null) exception.printStackTrace();
-        });
+    // Update the status.
+    setInfoText("loading model " + selectedItem.getDisplayName());
+
+    TransformableNode transformableNode = new TransformableNode(
+            ((ArFragment) fragment).getTransformationSystem());
+
+    sceneContext.attachModelNodeToAnchorNode(transformableNode);
+
+    transformableNode.select();
+
+    sceneContext.attachInfoCardNode(selectedItem);
+
+    // Set the renderable from the gallery.
+    selectedItem.getRenderableHolder().thenAccept(renderable -> {
+      sceneContext.setModelRenderable(renderable);
+      SceneContext.setScaleRange(transformableNode, .01f, 3f);
+    }).exceptionally(throwable -> {
+      handleRequestFailure(-1, throwable.getMessage(), (Exception) throwable);
+      return null;
+    });
+  }
+
+  /**
+   * Set the text of the info overlay.
+   */
+  private void setInfoText(String msg) {
+    if (model_info != null) {
+      model_info.setText(msg);
     }
+  }
+
+  private void handleRequestFailure(int statusCode, String message, Exception exception) {
+    runOnUiThread(() ->
+    {
+      String msg = "Request failed. Status code " + statusCode + ", message: " + message +
+              ((exception != null) ? ", exception: " + exception : "");
+      new AlertDialog.Builder(this).setTitle("Error").
+              setMessage(msg).create().show();
+      Log.e(TAG, msg);
+      if (exception != null) exception.printStackTrace();
+    });
+  }
 }

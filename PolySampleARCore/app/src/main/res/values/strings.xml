@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <resources>
-  <string name="app_name">HelloAR Java</string>
+  <string name="app_name">Poly Browser</string>
     <string name="keywords">keywords</string>
   <string name="default_search_keywords">fruit</string>
   <string name="search_poly">Search Poly</string>
