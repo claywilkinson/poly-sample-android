@@ -129,9 +129,12 @@ public class PolyGalleryActivity extends AppCompatActivity {
       public void connectListener() {
         ArFragment arFragment = (ArFragment) fragment;
         arFragment.setOnTapArPlaneListener(PolyGalleryActivity.this::onTapPlane);
-        Objects.requireNonNull(getScene()).addOnUpdateListener(
+        Scene scene = arFragment.getArSceneView().getScene();
+        Objects.requireNonNull(scene).addOnUpdateListener(
                 PolyGalleryActivity.this::onSceneUpdate);
         fragment.getLifecycle().removeObserver(this);
+        // Set the scene in the scene context.
+        sceneContext.setScene(scene);
       }
     });
   }
@@ -160,6 +163,8 @@ public class PolyGalleryActivity extends AppCompatActivity {
                 PolyGalleryActivity.this::onSceneUpdate);
         fragment.getLifecycle().removeObserver(this);
 
+        // Set the scene in the scene context.
+        sceneContext.setScene(sceneformFragment.getSceneView().getScene());
         // Initialize the scene since AR is not used, we need to position the camera.
         initializeNonArScene();
       }
@@ -170,24 +175,9 @@ public class PolyGalleryActivity extends AppCompatActivity {
    * Move the camera to a reasonable default to simulate where the camera would be in AR mode.
    */
   private void initializeNonArScene() {
-    Camera camera = Objects.requireNonNull(getScene()).getCamera();
+    Camera camera = sceneContext.getCamera();
     camera.setWorldPosition(STARTING_CAMERA_POSITION);
     camera.setWorldRotation(STARTING_CAMERA_ROTATION);
-  }
-
-  /**
-   * Abstracts the getting of the Scene object.
-   *
-   * @return The Scenform scene or null if a SceneView is not available.
-   */
-  private Scene getScene() {
-    SceneView sceneView = null;
-    if (fragment instanceof ArFragment) {
-      sceneView = ((ArFragment) fragment).getArSceneView();
-    } else if (fragment instanceof SceneformFragment) {
-      sceneView = ((SceneformFragment) fragment).getSceneView();
-    }
-    return sceneView != null ? sceneView.getScene() : null;
   }
 
   /**
@@ -299,26 +289,18 @@ public class PolyGalleryActivity extends AppCompatActivity {
       return;
     }
 
-    Scene scene = getScene();
+    // Sets the overlay text.
+    setInfoText(sceneContext.generateNodeInfo());
 
-    if (scene == null) {
-      return;
-    }
-
-    Camera camera = scene.getCamera();
-
-    setInfoText(sceneContext.generateNodeInfo(camera));
-
-    sceneContext.rotateInfoCardToCamera(camera);
-
+    // Rotates the info card node to face the camera.
+    sceneContext.rotateInfoCardToCamera();
   }
 
   private void onSceneTouch(View view) {
     // Place a node at the center of the view.
 
     SceneView sceneView = (SceneView) view;
-    Ray ray =
-            sceneView.getScene().getCamera().screenPointToRay(sceneView.getWidth() / 2,
+    Ray ray = sceneContext.getCamera().screenPointToRay(sceneView.getWidth() / 2,
                     sceneView.getHeight() - sceneView.getHeight() / 4);
 
     Vector3 pos = ray.getPoint(1f);
@@ -331,7 +313,7 @@ public class PolyGalleryActivity extends AppCompatActivity {
     // Update the status.
     setInfoText("loading model " + selectedItem.getDisplayName());
 
-    sceneContext.resetModelNode(getScene(), pos);
+    sceneContext.resetModelNode(pos);
 
     sceneContext.attachInfoCardNode(selectedItem);
 
@@ -353,7 +335,7 @@ public class PolyGalleryActivity extends AppCompatActivity {
     // Create the Anchor.
     Anchor anchor = hitResult.createAnchor();
 
-    sceneContext.resetAnchorNode(anchor, getScene());
+    sceneContext.resetAnchorNode(anchor);
 
     // Update the status.
     setInfoText("loading model " + selectedItem.getDisplayName());

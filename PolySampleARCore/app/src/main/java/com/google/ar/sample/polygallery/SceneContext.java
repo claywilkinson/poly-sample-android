@@ -43,6 +43,7 @@ public class SceneContext {
   private AnchorNode anchorNode;
   private Node modelNode;
   private Node infoCard;
+  private Scene scene;
 
   /**
    * Create a new context for the scene
@@ -50,6 +51,22 @@ public class SceneContext {
    */
   public SceneContext(Context context) {
     this.context = context;
+  }
+
+  /**
+   * Sets the scene object for this context.  This simplifies the differences between an AR based
+   * scene and non-AR based scene.
+   * @param scene
+   */
+  public void setScene(Scene scene) {
+    this.scene = scene;
+  }
+
+  /**
+   * Returns the scene's camera.
+   */
+  public Camera getCamera() {
+    return scene != null ? scene.getCamera() : null;
   }
 
   /**
@@ -109,7 +126,11 @@ public class SceneContext {
    * Generates a string for describing the node's scale and rotation.
    * @return string for model info, or null if the node is not available.
    */
-  public String generateNodeInfo(Camera camera) {
+  public String generateNodeInfo() {
+    if (scene == null) {
+      return null;
+    }
+    Camera camera = scene.getCamera();
     String msg = null;
     if (modelNode != null && modelNode.getRenderable() != null) {
       Vector3 scale = modelNode.getLocalScale();
@@ -139,9 +160,12 @@ public class SceneContext {
 
   /**
    * Rotates the info card in the  scene to face the camera.
-   * @param camera
    */
-  public void rotateInfoCardToCamera(Camera camera) {
+  public void rotateInfoCardToCamera() {
+    if (scene == null) {
+      return;
+    }
+    Camera camera = scene.getCamera();
     // Rotate the card to look at the camera.
     if (infoCard != null) {
       Vector3 cameraPosition = camera.getWorldPosition();
@@ -154,10 +178,9 @@ public class SceneContext {
 
   /**
    * Resets the model node and positions it.
-   * @param scene the scene to attach to.
    * @param position the world position of the node.
    */
-  public void resetModelNode(Scene scene, Vector3 position) {
+  public void resetModelNode(Vector3 position) {
     if (modelNode != null) {
       modelNode.setParent(null);
     }
@@ -165,6 +188,8 @@ public class SceneContext {
     modelNode = new Node();
     modelNode.setParent(scene);
     modelNode.setWorldPosition(position);
+    modelNode.setWorldRotation(Quaternion.identity());
+    modelNode.setWorldScale(Vector3.one());
   }
 
   /**
@@ -232,7 +257,7 @@ public class SceneContext {
    * This detaches any existing anchor and sets the anchor to the value passed in and
    * sets the parent as the scene.
    */
-  public void resetAnchorNode(Anchor anchor, Scene scene) {
+  public void resetAnchorNode(Anchor anchor) {
     // Clean up old anchor
     if (anchorNode != null && anchorNode.getAnchor() != null) {
       anchorNode.getAnchor().detach();
@@ -254,4 +279,5 @@ public class SceneContext {
     modelNode = node;
     modelNode.setParent(anchorNode);
   }
+
 }
