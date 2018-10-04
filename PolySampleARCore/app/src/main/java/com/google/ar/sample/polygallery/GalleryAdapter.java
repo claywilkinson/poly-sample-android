@@ -38,111 +38,112 @@ import java.util.List;
  * Recycler view adapter for displaying thumbnails of Poly models.
  */
 class GalleryAdapter extends RecyclerView.Adapter {
-  private static final String TAG = "GalleryAdapter";
+    private static final String TAG = "GalleryAdapter";
 
-  private final List<GalleryItem> items;
-  private int selected;
+    private final List<GalleryItem> items;
+    private int selected;
 
-  public GalleryAdapter(List<GalleryItem> items) {
-    this.items = items;
-    selected = -1;
-  }
-
-  @NonNull
-  @Override
-  public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-    // Create a new view.
-    ImageView v = new ImageView(parent.getContext());
-    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-            ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT);
-    lp.setMargins(4, 4, 4, 4);
-    v.setPadding(8, 8, 8, 8);
-    v.setImageResource(R.drawable.model_placeholder);
-    v.setCropToPadding(true);
-    v.setScaleType(ImageView.ScaleType.CENTER_CROP);
-    v.setImageResource(R.drawable.model_placeholder);
-    v.setLayoutParams(lp);
-    return new GalleryItemHolder(v, this);
-  }
-
-  @Override
-  public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-    if (holder.getItemId() != position) {
-      ((GalleryItemHolder) holder).setItem(items.get(position));
-      items.get(position).setViewHolder(holder);
-      items.get(position).getThumbnailHolder().thenAccept(bitmap -> {
-        ImageView imageView = (ImageView) holder.itemView;
-        imageView.setImageBitmap(bitmap);
-        imageView.requestLayout();
-      });
+    public GalleryAdapter(List<GalleryItem> items) {
+        this.items = items;
+        selected = -1;
     }
-  }
 
-  @Override
-  public int getItemCount() {
-    return items.size();
-  }
+    public static List<GalleryItem> parseListResults(
+            byte[] responseBody, Handler backgroundThreadHandler) throws IOException {
+        Log.d(TAG, "Got asset response (" + responseBody.length + " bytes). Parsing.");
+        String assetBody = new String(responseBody, Charset.forName("UTF-8"));
+        Log.d(TAG, assetBody);
 
-  public GalleryItem getSelected() {
-    return selected >= 0 ? items.get(selected) : null;
-  }
+        try {
+            JSONObject response = new JSONObject(assetBody);
 
-  public void setSelected(GalleryItem item) {
-    if (item == null) {
-      selected = -1;
-    } else {
-      selected = items.indexOf(item);
-    }
-  }
+            List<GalleryItem> items = new ArrayList<>();
 
-  public static List<GalleryItem> parseListResults(byte[] responseBody, Handler backgroundThreadHandler) throws IOException {
-    Log.d(TAG, "Got asset response (" + responseBody.length + " bytes). Parsing.");
-    String assetBody = new String(responseBody, Charset.forName("UTF-8"));
-    Log.d(TAG, assetBody);
+            JSONArray assets = response.getJSONArray("assets");
 
-    try {
-      JSONObject response = new JSONObject(assetBody);
+            for (int i = 0; i < assets.length(); i++) {
+                JSONObject obj = assets.getJSONObject(i);
+                // Use the name as the key.
+                GalleryItem item = new GalleryItem(
+                        obj.getString("name"));
+                item.setDisplayName(
+                        obj.getString("displayName"));
+                item.setAuthorInfo(
+                        obj.getString("authorName"),
+                        obj.getString("license"));
 
-      List<GalleryItem> items = new ArrayList<>();
+                if (obj.has("description")) {
+                    item.setDescription(obj.getString("description"));
+                }
 
-      JSONArray assets = response.getJSONArray("assets");
+                String url = obj.getJSONObject("thumbnail").getString("url");
+                item.setThumbnail(url);
+                item.loadThumbnail(backgroundThreadHandler);
 
-      for (int i = 0; i < assets.length(); i++) {
-        JSONObject obj = assets.getJSONObject(i);
-        // Use the name as the key.
-        GalleryItem item = new GalleryItem(
-                obj.getString("name"));
-        item.setDisplayName(
-                obj.getString("displayName"));
-        item.setAuthorInfo(
-                obj.getString("authorName"),
-                obj.getString("license"));
+                JSONArray formats = obj.getJSONArray("formats");
+                for (int j = 0; j < formats.length(); j++) {
+                    JSONObject format = formats.getJSONObject(j);
+                    if (format.getString("formatType").equals("GLTF2")) {
+                        item.setModelUrl(format.getJSONObject("root").getString("url"));
+                        break;
+                    }
+                }
+                items.add(item);
+            }
 
-        if (obj.has("description")) {
-          item.setDescription(obj.getString("description"));
+            return items;
+
+        } catch (JSONException e) {
+            Log.e(TAG, "JSON parsing error while processing response: " + e);
+            throw new IOException("JSON parsing error", e);
         }
-
-        String url = obj.getJSONObject("thumbnail").getString("url");
-        item.setThumbnail(url);
-        item.loadThumbnail(backgroundThreadHandler);
-
-        JSONArray formats = obj.getJSONArray("formats");
-        for (int j = 0; j < formats.length(); j++) {
-          JSONObject format = formats.getJSONObject(j);
-          if (format.getString("formatType").equals("GLTF2")) {
-            item.setModelUrl(format.getJSONObject("root").getString("url"));
-            break;
-          }
-        }
-        items.add(item);
-      }
-
-      return items;
-
-    } catch (JSONException e) {
-      Log.e(TAG, "JSON parsing error while processing response: " + e);
-     throw new IOException("JSON parsing error", e);
     }
-  }
+
+    @NonNull
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // Create a new view.
+        ImageView v = new ImageView(parent.getContext());
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                ActionBar.LayoutParams.WRAP_CONTENT, ActionBar.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(4, 4, 4, 4);
+        v.setPadding(8, 8, 8, 8);
+        v.setImageResource(R.drawable.model_placeholder);
+        v.setCropToPadding(true);
+        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        v.setImageResource(R.drawable.model_placeholder);
+        v.setLayoutParams(lp);
+        return new GalleryItemHolder(v, this);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        if (holder.getItemId() != position) {
+            ((GalleryItemHolder) holder).setItem(items.get(position));
+            items.get(position).setViewHolder(holder);
+            items.get(position).getThumbnailHolder().thenAccept(bitmap -> {
+                ImageView imageView = (ImageView) holder.itemView;
+                imageView.setImageBitmap(bitmap);
+                imageView.requestLayout();
+            });
+        }
+    }
+
+    @Override
+    public int getItemCount() {
+        return items.size();
+    }
+
+    public GalleryItem getSelected() {
+        return selected >= 0 ? items.get(selected) : null;
+    }
+
+    public void setSelected(GalleryItem item) {
+        if (item == null) {
+            selected = -1;
+        } else {
+            selected = items.indexOf(item);
+        }
+    }
 
 }

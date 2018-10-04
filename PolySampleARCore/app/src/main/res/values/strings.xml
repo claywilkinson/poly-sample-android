@@ -16,4 +16,9 @@
 -->
 <resources>
   <string name="app_name">HelloAR Java</string>
+    <string name="keywords">keywords</string>
+  <string name="default_search_keywords">fruit</string>
+  <string name="search_poly">Search Poly</string>
+  <string name="search">Search</string>
+  <string name="ar_mode">AR Mode</string>
 </resources>

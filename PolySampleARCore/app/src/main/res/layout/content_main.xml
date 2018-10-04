@@ -13,7 +13,7 @@
         android:layout_height="match_parent"
         android:elevation="2dp"
         android:singleLine="false"
-        android:text="TextView"
+        android:text=""
         android:textAppearance="@style/TextAppearance.AppCompat.Headline"
         app:layout_constraintTop_toTopOf="parent"/>
 
@@ -55,12 +55,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="AR Mode"/>
+                android:text="@string/ar_mode"/>
             <Button
                 android:id="@+id/search"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Search"
+                android:text="@string/search"
                 android:layout_weight="1"
                 android:layout_margin="5dp"
                 />
