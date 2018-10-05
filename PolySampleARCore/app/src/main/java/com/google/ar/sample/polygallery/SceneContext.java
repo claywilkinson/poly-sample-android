@@ -54,6 +54,39 @@ public class SceneContext {
   }
 
   /**
+   * Limits the modelNode size by scaling.
+   * @param minSize  the min size in meters for the model.
+   * @param maxSize the max size in meters for the model.
+   */
+  public  void limitSize(float minSize, float maxSize) {
+    Box modelBox = (Box) modelNode.getCollisionShape();
+    Vector3 size = modelBox.getSize();
+    float maxDim = Math.max(size.x, Math.max(size.y, size.z));
+    float currentScale = modelNode.getWorldScale().x;
+
+    if (infoCard != null) {
+      Box infoBox = (Box)infoCard.getCollisionShape();
+      size = infoBox.getSize();
+      float infoMaxDim = Math.max(size.x, Math.max(size.y, size.z));
+      if (infoMaxDim > maxDim) {
+        maxDim = infoMaxDim;
+        currentScale = infoCard.getWorldScale().x;
+      }
+    }
+
+    // Assume all dimensions have the same scale.
+    float currentSize = maxDim * currentScale;
+    float newScale = currentScale;
+    if (currentSize < minSize) {
+      newScale = newScale * (minSize/currentSize);
+    } else if (currentSize > maxSize) {
+      newScale = newScale * (maxSize/currentSize);
+    }
+    modelNode.setWorldScale(new Vector3(newScale, newScale, newScale));
+
+  }
+
+  /**
    * Sets the scene object for this context.  This simplifies the differences between an AR based
    * scene and non-AR based scene.
    * @param scene
@@ -249,7 +282,6 @@ public class SceneContext {
   public void setModelRenderable(ModelRenderable renderable) {
     modelNode.setRenderable(renderable);
     infoCard.setLocalPosition(new Vector3(0, getRenderableHeight(renderable), 0));
-
   }
 
   /**
@@ -279,5 +311,4 @@ public class SceneContext {
     modelNode = node;
     modelNode.setParent(anchorNode);
   }
-
 }

@@ -31,7 +31,6 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -43,14 +42,12 @@ import com.google.ar.sceneform.FrameTime;
 import com.google.ar.sceneform.Scene;
 import com.google.ar.sceneform.SceneView;
 import com.google.ar.sceneform.collision.Ray;
-import com.google.ar.sceneform.math.Quaternion;
 import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -59,8 +56,7 @@ import java.util.Objects;
  */
 public class PolyGalleryActivity extends AppCompatActivity {
   private static final String TAG = PolyGalleryActivity.class.getSimpleName();
-  private static final Vector3 STARTING_CAMERA_POSITION = new Vector3(0, 2, 3);
-  private static final Quaternion STARTING_CAMERA_ROTATION = Quaternion.axisAngle(Vector3.left(), 15f);
+
   private RecyclerView gallery;
   private TextView model_info;
   private SceneContext sceneContext;
@@ -81,8 +77,16 @@ public class PolyGalleryActivity extends AppCompatActivity {
     sceneContext = new SceneContext(this);
 
     Switch arToggle = findViewById(R.id.ar_mode_toggle);
+    arToggle.setOnCheckedChangeListener((compoundButton, checked) -> {
+      if (checked) {
+        initializeARMode();
+      } else {
+        initializeNonArMode();
+      }
+    });
+
+    // Start in AR mode.
     arToggle.setChecked(true);
-    arToggle.setOnCheckedChangeListener(this::onArToggle);
     initializeARMode();
 
     // This is a text overlay.
@@ -94,19 +98,6 @@ public class PolyGalleryActivity extends AppCompatActivity {
     mBackgroundThread.start();
     // Handler for the background thread, to which we post background thread tasks.
     mBackgroundThreadHandler = new Handler(mBackgroundThread.getLooper());
-  }
-
-  /**
-   * Handles the toggling between AR and non-AR mode.
-   */
-  private void onArToggle(CompoundButton compoundButton, boolean checked) {
-    if (checked) {
-      Log.d(TAG, "Switching to AR Mode.");
-      initializeARMode();
-    } else {
-      Log.d(TAG, "Switching to non-AR mode.");
-      initializeNonArMode();
-    }
   }
 
   /**
@@ -128,13 +119,19 @@ public class PolyGalleryActivity extends AppCompatActivity {
       @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
       public void connectListener() {
         ArFragment arFragment = (ArFragment) fragment;
+
+        // Set the listener to handle user input.
         arFragment.setOnTapArPlaneListener(PolyGalleryActivity.this::onTapPlane);
+
+        // Add the update listener, this is called every frame.
         Scene scene = arFragment.getArSceneView().getScene();
-        Objects.requireNonNull(scene).addOnUpdateListener(
-                PolyGalleryActivity.this::onSceneUpdate);
-        fragment.getLifecycle().removeObserver(this);
-        // Set the scene in the scene context.
+        scene.addOnUpdateListener(PolyGalleryActivity.this::onSceneUpdate);
+
+        // Set the scene in the scene context helper object.
         sceneContext.setScene(scene);
+
+        // Remove the lifecycle observer since we're all set up.
+        fragment.getLifecycle().removeObserver(this);
       }
     });
   }
@@ -159,25 +156,19 @@ public class PolyGalleryActivity extends AppCompatActivity {
         // Keeping it simple, and just look for a tap event on the fragment.
         // Had this been an actual application, gesture processing would be more appropriate.
         sceneformFragment.getSceneView().setOnClickListener(PolyGalleryActivity.this::onSceneTouch);
-        sceneformFragment.getSceneView().getScene().addOnUpdateListener(
-                PolyGalleryActivity.this::onSceneUpdate);
+
+        // Add the update listener, this is called every frame.
+        Scene scene = sceneformFragment.getSceneView().getScene();
+        scene.addOnUpdateListener(PolyGalleryActivity.this::onSceneUpdate);
+
+        // Set the scene in the scene context helper object.
+        sceneContext.setScene(scene);
+
+        // Remove the lifecycle observer since we're all set up.
         fragment.getLifecycle().removeObserver(this);
 
-        // Set the scene in the scene context.
-        sceneContext.setScene(sceneformFragment.getSceneView().getScene());
-        // Initialize the scene since AR is not used, we need to position the camera.
-        initializeNonArScene();
       }
     });
-  }
-
-  /**
-   * Move the camera to a reasonable default to simulate where the camera would be in AR mode.
-   */
-  private void initializeNonArScene() {
-    Camera camera = sceneContext.getCamera();
-    camera.setWorldPosition(STARTING_CAMERA_POSITION);
-    camera.setWorldRotation(STARTING_CAMERA_ROTATION);
   }
 
   /**
@@ -297,13 +288,13 @@ public class PolyGalleryActivity extends AppCompatActivity {
   }
 
   private void onSceneTouch(View view) {
-    // Place a node at the center of the view.
+    Camera camera = sceneContext.getCamera();
+    Ray ray = new Ray(camera.getWorldPosition(), camera.getForward());
 
-    SceneView sceneView = (SceneView) view;
-    Ray ray = sceneContext.getCamera().screenPointToRay(sceneView.getWidth() / 2,
-                    sceneView.getHeight() - sceneView.getHeight() / 4);
+    // Place the node in front of the camera and down a little.
+    Vector3 pos = ray.getPoint(1.1f);
+    pos.y -= .25f;
 
-    Vector3 pos = ray.getPoint(1f);
 
     // Get the model selected from the Gallery.
     GalleryItem selectedItem = ((GalleryAdapter) gallery.getAdapter()).getSelected();
@@ -319,7 +310,10 @@ public class PolyGalleryActivity extends AppCompatActivity {
 
     // Set the renderable from the gallery.
     selectedItem.getRenderableHolder()
-            .thenAccept(renderable -> sceneContext.setModelRenderable(renderable))
+            .thenAccept(renderable -> {
+              sceneContext.setModelRenderable(renderable);
+              sceneContext.limitSize(1f, 1f);
+            })
             .exceptionally(throwable -> {
               handleRequestFailure(-1, throwable.getMessage(), (Exception) throwable);
               return null;

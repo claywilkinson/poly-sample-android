@@ -67,6 +67,11 @@ class GalleryAdapter extends RecyclerView.Adapter {
 
       List<GalleryItem> items = new ArrayList<>();
 
+      // See https://developers.google.com/poly/reference/api/rest/v1/assets/list
+      // for available fields.
+      if (!response.has("assets")) {
+        throw new IOException("No assets found");
+      }
       JSONArray assets = response.getJSONArray("assets");
 
       for (int i = 0; i < assets.length(); i++) {
@@ -74,11 +79,8 @@ class GalleryAdapter extends RecyclerView.Adapter {
         // Use the name as the key.
         GalleryItem item = new GalleryItem(
                 obj.getString("name"));
-        item.setDisplayName(
-                obj.getString("displayName"));
-        item.setAuthorInfo(
-                obj.getString("authorName"),
-                obj.getString("license"));
+        item.setDisplayName(obj.getString("displayName"));
+        item.setAuthorInfo(obj.getString("authorName"), obj.getString("license"));
 
         if (obj.has("description")) {
           item.setDescription(obj.getString("description"));
@@ -88,6 +90,7 @@ class GalleryAdapter extends RecyclerView.Adapter {
         item.setThumbnail(url);
         item.loadThumbnail(backgroundThreadHandler);
 
+        // Find the glTF URL.
         JSONArray formats = obj.getJSONArray("formats");
         for (int j = 0; j < formats.length(); j++) {
           JSONObject format = formats.getJSONObject(j);
